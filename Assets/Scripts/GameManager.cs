@@ -93,6 +93,11 @@ public class GameManager : MonoBehaviour
             Destroy(c.gameObject);
     }
 
+    public void HotSeatButton()
+    {
+        SceneManager.LoadScene("Game");
+    }
+
     public void StartGame()
     {
         SceneManager.LoadScene("Game");

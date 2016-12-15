@@ -8,7 +8,7 @@ public class Piece : MonoBehaviour {
 
     public bool IsForceToMove(Piece[,] board, int x, int y)
     {
-        if (!isWhite || isKing)
+        if (isWhite || isKing)
         {
             // Top left
             if (x >= 2 && y <= 5)

@@ -1,4 +1,5 @@
 ﻿using UnityEngine;
+using UnityEngine.UI;
 using System.Collections;
 using System.Collections.Generic;
 
@@ -10,8 +11,14 @@ public class CheckersBoard : MonoBehaviour {
 	public GameObject whitePiecePrefab;
 	public GameObject blackPiecePrefab;
 
+    public GameObject highlightsContainer;
+
+    public CanvasGroup alertCanvas;
+    private float lastAlert;
+    private bool alertActive;
+
 	private Vector3 boardOffset = new Vector3(-4.0f, 0, -4.0f);
-	private Vector3 pieceOffset = new Vector3(0.5f, 0, 0.5f);
+	private Vector3 pieceOffset = new Vector3(0.5f, 0.125f, 0.5f);
 
     public bool isWhite;
     private bool isWhiteTurn;
@@ -28,10 +35,25 @@ public class CheckersBoard : MonoBehaviour {
 
 	private void Start()
 	{
-        Instance = this;
+//        isWhite = true;
 
+        Instance = this;
         client = FindObjectOfType<Client>();
-        isWhite = client.isHost;
+
+        foreach (Transform t in highlightsContainer.transform)
+        {
+            t.position = Vector3.down * 100;
+        }
+
+        if (client)
+        {
+            isWhite = client.isHost;
+            Alert(client.players[0].name + " versus " + client.players[1].name);
+        }
+        else
+        {
+            Alert("White player's turn");
+        }
 
         isWhiteTurn = true;
         forcedPieces = new List<Piece>();
@@ -40,6 +62,12 @@ public class CheckersBoard : MonoBehaviour {
 
 	private void Update()
 	{
+        foreach (Transform t in highlightsContainer.transform)
+        {
+            t.Rotate(Vector3.up * 90 * Time.deltaTime);
+        }
+
+        UpdateAlert();
 		UpdateMouseOver();
 
         if (isWhite ? isWhiteTurn : !isWhiteTurn)
@@ -148,6 +176,7 @@ public class CheckersBoard : MonoBehaviour {
 
 			startDrag = Vector2.zero;
 			selectedPiece = null;
+            Highlight();
 			return;
 		}
 
@@ -159,6 +188,7 @@ public class CheckersBoard : MonoBehaviour {
                 MovePiece(selectedPiece, x1, y1);
                 startDrag = Vector2.zero;
                 selectedPiece = null;
+                Highlight();
                 return;
             }
 
@@ -184,6 +214,7 @@ public class CheckersBoard : MonoBehaviour {
                     MovePiece(selectedPiece, x1, y1);
                     startDrag = Vector2.zero;
                     selectedPiece = null;
+                    Highlight();
                     return;
                 }
 
@@ -198,6 +229,7 @@ public class CheckersBoard : MonoBehaviour {
                 MovePiece(selectedPiece, x1, y1);
                 startDrag = Vector2.zero;
                 selectedPiece = null;
+                Highlight();
                 return;
             }
         }
@@ -225,13 +257,16 @@ public class CheckersBoard : MonoBehaviour {
             }
         }
 
-        string msg = "CMOV|";
-        msg += startDrag.x.ToString() + "|";
-        msg += startDrag.y.ToString() + "|";
-        msg += endDrag.x.ToString() + "|";
-        msg += endDrag.y.ToString();
+        if (client)
+        {
+            string msg = "CMOV|";
+            msg += startDrag.x.ToString() + "|";
+            msg += startDrag.y.ToString() + "|";
+            msg += endDrag.x.ToString() + "|";
+            msg += endDrag.y.ToString();
 
-        client.Send(msg);
+            client.Send(msg);
+        }
 
         selectedPiece = null;
         startDrag = Vector2.zero;
@@ -240,9 +275,26 @@ public class CheckersBoard : MonoBehaviour {
             return;
 
         isWhiteTurn = !isWhiteTurn;
-		//isWhite = !isWhite;
         hasKilled = false;
         CheckVictory();
+
+        if (!client)
+        {
+            isWhite = !isWhite;
+            if (isWhite)
+                Alert("White player's turn");
+            else
+                Alert("Black player's turn");
+        }
+        else
+        {
+            if (isWhite)
+                Alert(client.players[0].name + "'s turn");
+            else
+                Alert(client.players[1].name + "'s turn");
+        }
+
+        ScanForPossibleMove();
     }
 
     private void CheckVictory()
@@ -278,6 +330,7 @@ public class CheckersBoard : MonoBehaviour {
         if (pieces[x, y].IsForceToMove(pieces, x, y))
             forcedPieces.Add(pieces[x, y]);
 
+        Highlight();
         return forcedPieces;
     }
 
@@ -287,20 +340,27 @@ public class CheckersBoard : MonoBehaviour {
 
         // Check all the pieces
         for (int i = 0; i < 8; i++)
-        {
             for (int j = 0; j < 8; j++) 
-            {
                 if (pieces[i, j] != null && pieces[i, j].isWhite == isWhiteTurn)
-                {
                     if (pieces[i, j].IsForceToMove(pieces, i, j))
-                    {
                         forcedPieces.Add(pieces[i, j]);
-                    }
-                }      
-            }
+
+        Highlight();
+        return forcedPieces;
+    }
+
+    private void Highlight()
+    {
+        foreach (Transform t in highlightsContainer.transform)
+        {
+            t.position = Vector3.down * 100;
         }
 
-        return forcedPieces;
+        if (forcedPieces.Count > 0)
+            highlightsContainer.transform.GetChild(0).transform.position = forcedPieces[0].transform.position + Vector3.down * 0.1f;
+        
+        if (forcedPieces.Count > 1)
+            highlightsContainer.transform.GetChild(1).transform.position = forcedPieces[1].transform.position + Vector3.down * 0.1f;
     }
 
 	private void GenerateBoard()
@@ -346,4 +406,28 @@ public class CheckersBoard : MonoBehaviour {
 	{
 		p.transform.position = (Vector3.right * x) + (Vector3.forward * y) + boardOffset + pieceOffset;
 	}
+
+    public void Alert(string text)
+    {
+        alertCanvas.GetComponentInChildren<Text>().text = text;
+        alertCanvas.alpha = 1;
+        lastAlert = Time.time;
+        alertActive = true;
+    }
+
+    public void UpdateAlert()
+    {
+        if (alertActive)
+        {
+            if (Time.time - lastAlert > 1.5f)
+            {
+                alertCanvas.alpha = 1 - ((Time.time - lastAlert) - 1.5f);
+
+                if (Time.time - lastAlert > 2.5f)
+                {
+                    alertActive = false;
+                }
+            }
+        }
+    }
 }

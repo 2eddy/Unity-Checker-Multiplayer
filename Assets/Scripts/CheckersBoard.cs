@@ -1,4 +1,5 @@
 ﻿using UnityEngine;
+using UnityEngine.SceneManagement;
 using UnityEngine.UI;
 using System.Collections;
 using System.Collections.Generic;
@@ -11,11 +12,16 @@ public class CheckersBoard : MonoBehaviour {
 	public GameObject whitePiecePrefab;
 	public GameObject blackPiecePrefab;
 
+    public Transform chatMessageContainer;
+    public GameObject messagePrefab;
+
     public GameObject highlightsContainer;
 
     public CanvasGroup alertCanvas;
     private float lastAlert;
     private bool alertActive;
+    private bool gameIsOver;
+    private float winTime;
 
 	private Vector3 boardOffset = new Vector3(-4.0f, 0, -4.0f);
 	private Vector3 pieceOffset = new Vector3(0.5f, 0.125f, 0.5f);
@@ -53,6 +59,13 @@ public class CheckersBoard : MonoBehaviour {
         else
         {
             Alert("White player's turn");
+            Transform c = GameObject.Find("Canvas").transform;
+            foreach (Transform t in c)
+            {
+                t.gameObject.SetActive(false);
+            }
+
+            c.GetChild(0).gameObject.SetActive(true);
         }
 
         isWhiteTurn = true;
@@ -62,6 +75,25 @@ public class CheckersBoard : MonoBehaviour {
 
 	private void Update()
 	{
+        if (gameIsOver)
+        {
+            if (Time.time - winTime > 3.0f)
+            {
+                Server server = FindObjectOfType<Server>();
+                Client client = FindObjectOfType<Client>();
+
+                if (server)
+                    Destroy(server.gameObject);
+
+                if (client)
+                    Destroy(client.gameObject);
+
+                SceneManager.LoadScene("Menu");
+            }
+
+            return;
+        }
+        
         foreach (Transform t in highlightsContainer.transform)
         {
             t.Rotate(Vector3.up * 90 * Time.deltaTime);
@@ -278,20 +310,23 @@ public class CheckersBoard : MonoBehaviour {
         hasKilled = false;
         CheckVictory();
 
-        if (!client)
+        if (!gameIsOver)
         {
-            isWhite = !isWhite;
-            if (isWhite)
-                Alert("White player's turn");
+            if (!client)
+            {
+                isWhite = !isWhite;
+                if (isWhite)
+                    Alert("White player's turn");
+                else
+                    Alert("Black player's turn");
+            }
             else
-                Alert("Black player's turn");
-        }
-        else
-        {
-            if (isWhite)
-                Alert(client.players[0].name + "'s turn");
-            else
-                Alert(client.players[1].name + "'s turn");
+            {
+                if (isWhite)
+                    Alert(client.players[0].name + "'s turn");
+                else
+                    Alert(client.players[1].name + "'s turn");
+            }
         }
 
         ScanForPossibleMove();
@@ -317,10 +352,14 @@ public class CheckersBoard : MonoBehaviour {
 
     private void Victory(bool isWhite)
     {
+        winTime = Time.time;
+
         if (isWhite)
-            Debug.Log("White team has won");
+            Alert("White player has won!");
         else
-            Debug.Log("Black team has won");
+            Alert("Black player has won!");
+
+        gameIsOver = true;
     }
 
     private List<Piece> ScanForPossibleMove(Piece p, int x, int y)
@@ -429,5 +468,25 @@ public class CheckersBoard : MonoBehaviour {
                 }
             }
         }
+    }
+
+    public void ChatMessage(string msg)
+    {
+        GameObject go = Instantiate(messagePrefab) as GameObject;
+        go.transform.SetParent(chatMessageContainer);
+
+        go.GetComponentInChildren<Text>().text = msg;
+    }
+
+    public void SendChatMessage()
+    {
+        InputField i = GameObject.Find("MessageInput").GetComponent<InputField>();
+
+        if (i.text == "")
+            return;
+
+        client.Send("CMSG|" + i.text);
+
+        i.text = "";
     }
 }

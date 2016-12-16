@@ -157,6 +157,10 @@ public class Server : MonoBehaviour
             case "CMOV":
                 Broadcast("SMOV|" + aData[1] + "|" + aData[2] + "|" + aData[3] + "|" + aData[4], clients);
                 break;
+
+            case "CMSG":
+                Broadcast("SMSG|" + c.clientName + " : " + aData[1], clients);
+                break;
         }
     }
 }

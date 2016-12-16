@@ -97,6 +97,10 @@ public class Client : MonoBehaviour
                     int.Parse(aData[4]) 
                 );
                 break;
+
+            case "SMSG":
+                CheckersBoard.Instance.ChatMessage(aData[1]);
+                break;
         }
     }
 
